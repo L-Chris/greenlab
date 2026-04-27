@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Plant {
+  id           String             @id @default(cuid())
+  name         String
+  cultivar     String?
+  displayOrder Int                @default(0)
+  isActive     Boolean            @default(true)
+  measurements PlantMeasurement[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([isActive, displayOrder])
+}
+
+model MeasurementSession {
+  id           String             @id @default(cuid())
+  measuredAt   DateTime
+  label        String?
+  note         String?            @db.Text
+  measurements PlantMeasurement[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([measuredAt])
+}
+
+model PlantMeasurement {
+  id             String             @id @default(cuid())
+  sessionId      String
+  plantId        String
+  weight         Decimal            @db.Decimal(10, 2)
+  delta          Decimal?           @db.Decimal(10, 2)
+  deltaPercent   Decimal?           @db.Decimal(8, 4)
+  session        MeasurementSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  plant          Plant              @relation(fields: [plantId], references: [id], onDelete: Cascade)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([sessionId, plantId])
+  @@index([plantId, createdAt])
+}
+
+model EnvironmentReading {
+  id          String   @id @default(cuid())
+  entityId    String
+  kind        String
+  value       Decimal  @db.Decimal(10, 3)
+  unit        String?
+  recordedAt  DateTime
+  raw         Json?
+  createdAt   DateTime @default(now())
+
+  @@unique([entityId, recordedAt])
+  @@index([kind, recordedAt])
+}
+
+model SyncLog {
+  id          String    @id @default(cuid())
+  source      String
+  status      String
+  startedAt   DateTime  @default(now())
+  finishedAt  DateTime?
+  message     String?   @db.Text
+  rowsInserted Int      @default(0)
+}
