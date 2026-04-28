@@ -1,4 +1,4 @@
-import { Activity, Droplets, Thermometer, TrendingDown, TrendingUp } from "lucide-react";
+import { Droplets, Thermometer, TrendingUp, Wind } from "lucide-react";
 import { format } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { fixed, percent, toNumber } from "@/lib/format";
@@ -14,6 +14,61 @@ type MeasurementChartRow = {
   time: string;
   [plantName: string]: string | number | null;
 };
+
+type VpdStatus = {
+  description: string;
+  tone: string;
+};
+
+function calculateVpd(temperature: number | null, humidity: number | null) {
+  if (temperature === null || humidity === null) return null;
+  if (humidity < 0 || humidity > 100) return null;
+
+  const saturationVaporPressure = 0.6108 * Math.exp((17.27 * temperature) / (temperature + 237.3));
+  return saturationVaporPressure * (1 - humidity / 100);
+}
+
+function getVpdStatus(vpd: number | null): VpdStatus {
+  if (vpd === null) {
+    return {
+      description: "缺少温湿度数据，暂时无法判断蒸腾驱动力。",
+      tone: "text-slate-500"
+    };
+  }
+
+  if (vpd < 0.4) {
+    return {
+      description: "空气偏湿，蒸腾拉力较弱，叶面水分释放会比较慢。",
+      tone: "text-sky-700"
+    };
+  }
+
+  if (vpd < 0.8) {
+    return {
+      description: "蒸腾比较平缓，环境柔和，适合恢复期或根系偏弱时观察。",
+      tone: "text-cyan-700"
+    };
+  }
+
+  if (vpd < 1.2) {
+    return {
+      description: "处在相对舒适区，气孔交换和水分消耗通常更均衡。",
+      tone: "text-emerald-700"
+    };
+  }
+
+  if (vpd < 1.6) {
+    return {
+      description: "蒸腾开始变快，盆土消耗会上升，适合关注缺水节奏。",
+      tone: "text-amber-700"
+    };
+  }
+
+  return {
+    description: "空气偏干，蒸腾压力较高，需要留意叶片失水和补水策略。",
+    tone: "text-rose-700"
+  };
+}
 
 async function ensurePlants() {
   const count = await prisma.plant.count();
@@ -88,9 +143,11 @@ export default async function Home() {
   const latestSession = sessions[0];
   const latestTemperature = environment.find((item) => item.kind === "temperature");
   const latestHumidity = environment.find((item) => item.kind === "humidity");
-  const fallingCount =
-    latestSession?.measurements.filter((measurement) => (toNumber(measurement.delta) || 0) < 0)
-      .length || 0;
+  const latestTemperatureValue = toNumber(latestTemperature?.value);
+  const latestHumidityValue = toNumber(latestHumidity?.value);
+  const latestVpd = calculateVpd(latestTemperatureValue, latestHumidityValue);
+  const vpdStatus = getVpdStatus(latestVpd);
+  const vpdTimestamp = latestTemperature?.recordedAt || latestHumidity?.recordedAt;
 
   return (
     <main className="min-h-screen px-4 py-6 md:px-8 lg:px-10">
@@ -111,30 +168,26 @@ export default async function Home() {
           </div>
         </header>
 
-        <section className="grid gap-4 md:grid-cols-4">
-          <Metric
-            icon={<Activity className="h-5 w-5" />}
-            label="测量批次"
-            value={sessions.length.toString()}
-            hint={latestSession ? format(latestSession.measuredAt, "yyyy-MM-dd HH:mm") : "等待记录"}
-          />
-          <Metric
-            icon={<TrendingDown className="h-5 w-5" />}
-            label="最近下降"
-            value={`${fallingCount}/${plants.length}`}
-            hint="按最新一次记录计算"
-          />
+        <section className="grid gap-4 lg:grid-cols-3">
           <Metric
             icon={<Thermometer className="h-5 w-5" />}
             label="温度"
-            value={latestTemperature ? `${fixed(toNumber(latestTemperature.value), 1)}${latestTemperature.unit || ""}` : "-"}
+            value={latestTemperature ? `${fixed(latestTemperatureValue, 1)}${latestTemperature.unit || ""}` : "-"}
             hint={latestTemperature ? format(latestTemperature.recordedAt, "MM-dd HH:mm") : "等待 HA 数据"}
           />
           <Metric
             icon={<Droplets className="h-5 w-5" />}
             label="湿度"
-            value={latestHumidity ? `${fixed(toNumber(latestHumidity.value), 1)}${latestHumidity.unit || ""}` : "-"}
+            value={latestHumidity ? `${fixed(latestHumidityValue, 1)}${latestHumidity.unit || ""}` : "-"}
             hint={latestHumidity ? format(latestHumidity.recordedAt, "MM-dd HH:mm") : "可配置湿度实体"}
+          />
+          <Metric
+            icon={<Wind className="h-5 w-5" />}
+            label="VPD"
+            value={latestVpd === null ? "-" : `${fixed(latestVpd, 2)} kPa`}
+            hint={vpdTimestamp ? format(vpdTimestamp, "MM-dd HH:mm") : "等待最新温湿度数据"}
+            description={vpdStatus.description}
+            descriptionTone={vpdStatus.tone}
           />
         </section>
 
@@ -207,18 +260,23 @@ function Metric({
   icon,
   label,
   value,
-  hint
+  hint,
+  description,
+  descriptionTone
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   hint: string;
+  description?: string;
+  descriptionTone?: string;
 }) {
   return (
     <div className="rounded-lg border border-white/80 bg-white/85 p-4 shadow-soft backdrop-blur">
       <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-md bg-mint text-leaf">{icon}</div>
       <div className="text-sm text-slate-500">{label}</div>
       <div className="mt-1 text-2xl font-bold text-ink">{value}</div>
+      {description ? <div className={`mt-2 text-sm font-medium ${descriptionTone || "text-slate-600"}`}>{description}</div> : null}
       <div className="mt-2 text-xs text-slate-500">{hint}</div>
     </div>
   );
