@@ -19,11 +19,8 @@ export type HomeAssistantSyncResult = {
   to: Date;
 };
 
-const defaultTemperatureEntity =
-  "sensor.lumi_cn_lumi_158d008b80866d_v1_temperature_p_2_1";
-
 function entityList() {
-  return (process.env.HA_ENTITY_IDS || defaultTemperatureEntity)
+  return (process.env.HA_ENTITY_IDS || '')
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
