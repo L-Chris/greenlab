@@ -18,6 +18,10 @@ type ChartRow = {
 
 const colors = ["#2f7d5c", "#b4694d", "#28789b", "#8f5b2d", "#6c7a1f", "#8054a2"];
 
+function snapTo5(v: number, direction: "up" | "down"): number {
+  return direction === "down" ? Math.floor(v / 5) * 5 : Math.ceil(v / 5) * 5;
+}
+
 function computeVisibleDomain(
   data: ChartRow[],
   plantNames: string[],
@@ -44,18 +48,19 @@ function computeVisibleDomain(
 
   const range = max - min;
   if (range === 0) {
-    const span = Math.max(1.0, Math.abs(max) * 0.02);
-    return [max - span / 2, max + span / 2];
+    const span = Math.max(5, Math.ceil(Math.abs(max) * 0.02 / 5) * 5);
+    const mid = Math.round(max / 5) * 5;
+    return [mid - span / 2, mid + span / 2];
   }
 
-  const pad = range * 0.1;
-  let yMin = min - pad;
-  let yMax = max + pad;
+  const pad = Math.max(range * 0.1, 2.5);
+  let yMin = snapTo5(min - pad, "down");
+  let yMax = snapTo5(max + pad, "up");
 
-  if (yMax - yMin < 1.0) {
-    const mid = (min + max) / 2;
-    yMin = mid - 0.5;
-    yMax = mid + 0.5;
+  if (yMax - yMin < 5) {
+    const mid = Math.round((min + max) / 2 / 5) * 5;
+    yMin = mid - 5;
+    yMax = mid + 5;
   }
 
   return [yMin, yMax];
@@ -110,7 +115,7 @@ export function MeasurementChart({ data, plantNames }: { data: ChartRow[]; plant
           <LineChart data={data} margin={{ top: 20, right: 24, bottom: 8, left: 0 }}>
           <CartesianGrid stroke="#d9e3dc" strokeDasharray="3 3" />
           <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="#667085" />
-          <YAxis tick={{ fontSize: 12 }} stroke="#667085" width={48} domain={yDomain} />
+          <YAxis tick={{ fontSize: 12 }} stroke="#667085" width={56} domain={yDomain} allowDecimals={false} />
           <Tooltip
             contentStyle={{
               border: "1px solid #d9e3dc",
