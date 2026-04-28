@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 const starterPlants = ["姬星美人", "熊童子", "白玉虎皮兰", "莎莎女王", "绿萝", "三角梅"];
 
 type MeasurementChartRow = {
-  time: string;
+  ts: number;
   [plantName: string]: string | number | null;
 };
 
@@ -117,7 +117,7 @@ export default async function Home() {
   const orderedSessions = [...sessions].reverse();
   const chartRows: MeasurementChartRow[] = orderedSessions.map((session) => {
     const row: MeasurementChartRow = {
-      time: format(session.measuredAt, "MM-dd HH:mm")
+      ts: session.measuredAt.getTime()
     };
 
     for (const measurement of session.measurements) {

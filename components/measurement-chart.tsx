@@ -10,9 +10,10 @@ import {
   XAxis,
   YAxis
 } from "recharts";
+import { format } from "date-fns";
 
 type ChartRow = {
-  time: string;
+  ts: number;
   [plantName: string]: string | number | null;
 };
 
@@ -81,6 +82,18 @@ export function MeasurementChart({ data, plantNames }: { data: ChartRow[]; plant
     [data, plantNames, hiddenSeries]
   );
 
+  const xTicks = useMemo(() => {
+    if (data.length === 0) return [];
+    const first = new Date(data[0].ts);
+    first.setHours(12, 0, 0, 0);
+    const last = data[data.length - 1].ts;
+    const ticks: number[] = [];
+    for (let t = first.getTime(); t <= last; t += 86400000) {
+      ticks.push(t);
+    }
+    return ticks;
+  }, [data]);
+
   return (
     <div className="flex h-[360px] w-full flex-col gap-3">
       <div className="flex flex-wrap gap-2">
@@ -114,9 +127,19 @@ export function MeasurementChart({ data, plantNames }: { data: ChartRow[]; plant
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 20, right: 24, bottom: 8, left: 0 }}>
           <CartesianGrid stroke="#d9e3dc" strokeDasharray="3 3" />
-          <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="#667085" />
+          <XAxis
+            dataKey="ts"
+            type="number"
+            domain={["dataMin", "dataMax"]}
+            ticks={xTicks}
+            interval={0}
+            tickFormatter={(ts) => format(new Date(ts), "MM/dd")}
+            tick={{ fontSize: 12 }}
+            stroke="#667085"
+          />
           <YAxis tick={{ fontSize: 12 }} stroke="#667085" width={56} domain={yDomain} allowDecimals={false} />
           <Tooltip
+            labelFormatter={(ts) => format(new Date(ts), "MM/dd HH:mm")}
             contentStyle={{
               border: "1px solid #d9e3dc",
               borderRadius: 8,
