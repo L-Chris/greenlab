@@ -13,6 +13,9 @@ RUN npm install
 
 COPY . .
 RUN npm run build
+RUN mkdir -p .next/standalone/.next \
+	&& cp -R .next/static .next/standalone/.next/static \
+	&& if [ -d public ]; then cp -R public .next/standalone/public; fi
 
 ENV NODE_ENV=production
 
