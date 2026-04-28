@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -18,6 +18,49 @@ type ChartRow = {
 
 const colors = ["#2f7d5c", "#b4694d", "#28789b", "#8f5b2d", "#6c7a1f", "#8054a2"];
 
+function computeVisibleDomain(
+  data: ChartRow[],
+  plantNames: string[],
+  hiddenSeries: Record<string, boolean>
+): [number, number] | ["auto", "auto"] {
+  const visibleNames = plantNames.filter((n) => !hiddenSeries[n]);
+  if (visibleNames.length === 0) return ["auto", "auto"];
+
+  const values: number[] = [];
+  for (const row of data) {
+    for (const name of visibleNames) {
+      const v = row[name];
+      if (typeof v === "number" && Number.isFinite(v)) values.push(v);
+    }
+  }
+  if (values.length === 0) return ["auto", "auto"];
+
+  let min = Infinity;
+  let max = -Infinity;
+  for (const v of values) {
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+
+  const range = max - min;
+  if (range === 0) {
+    const span = Math.max(1.0, Math.abs(max) * 0.02);
+    return [max - span / 2, max + span / 2];
+  }
+
+  const pad = range * 0.1;
+  let yMin = min - pad;
+  let yMax = max + pad;
+
+  if (yMax - yMin < 1.0) {
+    const mid = (min + max) / 2;
+    yMin = mid - 0.5;
+    yMax = mid + 0.5;
+  }
+
+  return [yMin, yMax];
+}
+
 export function MeasurementChart({ data, plantNames }: { data: ChartRow[]; plantNames: string[] }) {
   const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({});
 
@@ -27,6 +70,11 @@ export function MeasurementChart({ data, plantNames }: { data: ChartRow[]; plant
       [name]: !current[name]
     }));
   };
+
+  const yDomain = useMemo(
+    () => computeVisibleDomain(data, plantNames, hiddenSeries),
+    [data, plantNames, hiddenSeries]
+  );
 
   return (
     <div className="flex h-[360px] w-full flex-col gap-3">
@@ -62,7 +110,7 @@ export function MeasurementChart({ data, plantNames }: { data: ChartRow[]; plant
           <LineChart data={data} margin={{ top: 20, right: 24, bottom: 8, left: 0 }}>
           <CartesianGrid stroke="#d9e3dc" strokeDasharray="3 3" />
           <XAxis dataKey="time" tick={{ fontSize: 12 }} stroke="#667085" />
-          <YAxis tick={{ fontSize: 12 }} stroke="#667085" width={48} />
+          <YAxis tick={{ fontSize: 12 }} stroke="#667085" width={48} domain={yDomain} />
           <Tooltip
             contentStyle={{
               border: "1px solid #d9e3dc",
