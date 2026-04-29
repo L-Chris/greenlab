@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import {
   Area,
-  AreaChart,
+  ComposedChart,
   CartesianGrid,
   Line,
   ResponsiveContainer,
@@ -44,7 +44,7 @@ export function EnvironmentChart({ data }: { data: EnvironmentRow[] }) {
   return (
     <div className="h-[260px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 18, right: 8, bottom: 4, left: 0 }}>
+        <ComposedChart data={data} margin={{ top: 18, right: 8, bottom: 4, left: 0 }}>
           <defs>
             <linearGradient id="temperature" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#b4694d" stopOpacity={0.35} />
@@ -119,7 +119,7 @@ export function EnvironmentChart({ data }: { data: EnvironmentRow[] }) {
             dot={{ r: 3, fill: "#e07b39" }}
             connectNulls
           />
-        </AreaChart>
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   );
