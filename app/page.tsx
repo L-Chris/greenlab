@@ -1,5 +1,5 @@
 import { Droplets, Thermometer, TrendingUp, Wind } from "lucide-react";
-import { format } from "date-fns";
+import { format, startOfDay } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { fixed, percent, toNumber } from "@/lib/format";
 import { EnvironmentChart } from "@/components/environment-chart";
@@ -13,6 +13,13 @@ const starterPlants = ["姬星美人", "熊童子", "白玉虎皮兰", "莎莎�
 type MeasurementChartRow = {
   ts: number;
   [plantName: string]: string | number | null;
+};
+
+type EnvironmentChartRow = {
+  ts: number;
+  temperature?: number | null;
+  humidity?: number | null;
+  vpd?: number | null;
 };
 
 type VpdStatus = {
@@ -105,6 +112,7 @@ export default async function Home() {
       }
     }),
     prisma.environmentReading.findMany({
+      where: { recordedAt: { gte: startOfDay(new Date()) } },
       take: 240,
       orderBy: { recordedAt: "desc" }
     }),
@@ -127,18 +135,46 @@ export default async function Home() {
     return row;
   });
 
-  const environmentRows = [...environment]
-    .reverse()
-    .reduce<Record<string, { time: string; temperature?: number | null; humidity?: number | null }>>(
-      (acc, reading) => {
-        const key = format(reading.recordedAt, "MM-dd HH:mm");
-        acc[key] = acc[key] || { time: key };
-        if (reading.kind === "temperature") acc[key].temperature = toNumber(reading.value);
-        if (reading.kind === "humidity") acc[key].humidity = toNumber(reading.value);
-        return acc;
-      },
-      {}
-    );
+  // Generate hourly VPD points
+  const hourlyVpdRows: EnvironmentChartRow[] = [];
+  const today = new Date();
+  const tempReadings = environment
+    .filter((r) => r.kind === "temperature")
+    .map((r) => ({ ts: r.recordedAt.getTime(), value: toNumber(r.value) }));
+  const humReadings = environment
+    .filter((r) => r.kind === "humidity")
+    .map((r) => ({ ts: r.recordedAt.getTime(), value: toNumber(r.value) }));
+
+  // Helper: find closest reading to a given timestamp
+  function closest(ts: number, readings: { ts: number; value: number | null }[]): number | null {
+    if (readings.length === 0) return null;
+    let best = Infinity;
+    let val: number | null = null;
+    for (const r of readings) {
+      if (r.value === null) continue;
+      const diff = Math.abs(r.ts - ts);
+      if (diff < best) { best = diff; val = r.value; }
+    }
+    return val;
+  }
+
+  for (let h = 0; h < 24; h++) {
+    const hourTs = new Date(today.getFullYear(), today.getMonth(), today.getDate(), h, 0, 0).getTime();
+    if (hourTs > Date.now()) continue;
+
+    const temperature = closest(hourTs, tempReadings);
+    const humidity = closest(hourTs, humReadings);
+
+    hourlyVpdRows.push({
+      ts: hourTs,
+      temperature,
+      humidity,
+      vpd: calculateVpd(temperature, humidity),
+    });
+  }
+
+  // Use hourly VPD rows as the single data source — each row has all fields
+  const envChartData: EnvironmentChartRow[] = hourlyVpdRows;
 
   const latestSession = sessions[0];
   const latestTemperature = environment.find((item) => item.kind === "temperature");
@@ -214,7 +250,7 @@ export default async function Home() {
           <div className="rounded-lg border border-white/80 bg-white/85 p-5 shadow-soft backdrop-blur">
             <h2 className="text-lg font-bold text-ink">温湿度</h2>
             <p className="mb-4 text-sm text-slate-500">由 Home Assistant history API 定期写入</p>
-            <EnvironmentChart data={Object.values(environmentRows)} />
+            <EnvironmentChart data={envChartData} />
           </div>
 
           <div className="overflow-hidden rounded-lg border border-white/80 bg-white/85 shadow-soft backdrop-blur">
