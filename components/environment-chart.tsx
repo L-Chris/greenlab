@@ -79,10 +79,23 @@ export function EnvironmentChart({ data }: { data: EnvironmentRow[] }) {
             stroke="#2f7d5c"
             width={42}
             domain={[0, vpdMax]}
-            tickFormatter={(v) => v.toFixed(1)}
+            tickFormatter={(v) => v.toFixed(2)}
           />
           <Tooltip
             labelFormatter={(ts) => format(new Date(ts), "MM/dd HH:mm")}
+            formatter={(value, name) => {
+              if (value == null) return ["--", name];
+              switch (name) {
+                case "温度":
+                  return [`${Number(value).toFixed(1)} °C`, name];
+                case "湿度":
+                  return [`${Number(value).toFixed(1)} %`, name];
+                case "VPD":
+                  return [`${Number(value).toFixed(2)} kPa`, name];
+                default:
+                  return [value, name];
+              }
+            }}
             contentStyle={{
               border: "1px solid #d9e3dc",
               borderRadius: 8,

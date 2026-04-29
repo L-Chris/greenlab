@@ -208,13 +208,13 @@ export default async function Home() {
           <Metric
             icon={<Thermometer className="h-5 w-5" />}
             label="温度"
-            value={latestTemperature ? `${fixed(latestTemperatureValue, 1)}${latestTemperature.unit || ""}` : "-"}
+            value={latestTemperature ? `${fixed(latestTemperatureValue, 1)} °C` : "-"}
             hint={latestTemperature ? format(latestTemperature.recordedAt, "MM-dd HH:mm") : "等待 HA 数据"}
           />
           <Metric
             icon={<Droplets className="h-5 w-5" />}
             label="湿度"
-            value={latestHumidity ? `${fixed(latestHumidityValue, 1)}${latestHumidity.unit || ""}` : "-"}
+            value={latestHumidity ? `${fixed(latestHumidityValue, 1)} %` : "-"}
             hint={latestHumidity ? format(latestHumidity.recordedAt, "MM-dd HH:mm") : "可配置湿度实体"}
           />
           <Metric
